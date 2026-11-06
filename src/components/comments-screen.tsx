@@ -1,14 +1,18 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { CommentCard } from '@/components/comment-card';
+import { ShieldBar } from '@/components/shield-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useCommentThreads, useReplyToComment } from '@/hooks/use-comments';
+import { useModeration } from '@/hooks/use-moderation';
 import { useAuth } from '@/providers/auth-provider';
+import { filterByModeration } from '@/services/moderation';
 import { YouTubeApiError, type Channel, type CommentThread } from '@/services/youtube';
 
 function errorMessage(error: unknown): string {
@@ -34,23 +38,41 @@ function toReplyError(error: unknown): Error {
 export function CommentsScreen({ channel }: { channel: Channel }) {
   const { signOut } = useAuth();
   const query = useCommentThreads(channel.id);
-  const reply = useReplyToComment(channel.id);
+  const { mutateAsync: postReply } = useReplyToComment(channel.id);
+  const queryClient = useQueryClient();
+  const [shieldOn, setShieldOn] = useState(true);
 
   const threads = useMemo(() => query.data?.pages.flatMap((p) => p.threads) ?? [], [query.data]);
+  const moderation = useModeration(threads);
+  const { getStatus } = moderation;
+
+  const { visible, stats } = useMemo(
+    () => filterByModeration(threads, moderation.getStatus, moderation.enabled && shieldOn),
+    [threads, moderation.getStatus, moderation.enabled, shieldOn],
+  );
+
+  const retryModerationErrors = useCallback(() => {
+    queryClient.refetchQueries({ queryKey: ['moderation'], predicate: (q) => q.state.status === 'error' });
+  }, [queryClient]);
 
   const onReply = useCallback(
     (threadId: string, text: string) =>
-      reply.mutateAsync({ threadId, text }).catch((e) => {
+      postReply({ threadId, text }).catch((e) => {
         throw toReplyError(e);
       }),
-    [reply],
+    [postReply],
   );
 
   const renderItem = useCallback(
     ({ item }: { item: CommentThread }) => (
-      <CommentCard thread={item} myChannelId={channel.id} onReply={onReply} />
+      <CommentCard
+        thread={item}
+        myChannelId={channel.id}
+        onReply={onReply}
+        moderation={getStatus(item)}
+      />
     ),
-    [channel.id, onReply],
+    [channel.id, onReply, getStatus],
   );
 
   return (
@@ -79,7 +101,8 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         </View>
       ) : (
         <FlatList
-          data={threads}
+          data={visible}
+          extraData={moderation.statuses}
           keyExtractor={(t) => t.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -94,9 +117,19 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
           }
           onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
           onEndReachedThreshold={0.5}
+          ListHeaderComponent={
+            moderation.enabled ? (
+              <ShieldBar
+                enabled={shieldOn}
+                onToggle={setShieldOn}
+                stats={stats}
+                onRetryErrors={retryModerationErrors}
+              />
+            ) : undefined
+          }
           ListEmptyComponent={
             <ThemedText themeColor="textSecondary" style={styles.centerText}>
-              Aucun commentaire pour l&apos;instant.
+              {threads.length > 0 ? 'Aucun commentaire à afficher.' : 'Aucun commentaire pour l\u2019instant.'}
             </ThemedText>
           }
           ListFooterComponent={

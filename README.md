@@ -2,7 +2,8 @@
 
 App mobile (Expo / React Native) pour un YouTubeur : liste chronologique des commentaires de la chaîne,
 avec photo, nom, date et vidéo associée, et réponse directe publiée sur YouTube.
-Prochaine étape : filtrage des commentaires agressifs via une API Azure ML.
+Bouclier : chaque commentaire est analysé par un modèle Azure ML (OFF = offensant, NOT = non offensant)
+et les commentaires offensants peuvent être masqués.
 
 ## Architecture
 
@@ -14,6 +15,8 @@ src/
   providers/auth-provider   état de connexion + chaîne YouTube connectée
   services/auth/            Google Sign-In (scope youtube.force-ssl)
   services/youtube/         client HTTP, appels API, mapping vers le modèle métier
+  services/moderation/      appel du modèle Azure ML, limiteur de concurrence, filtre « bouclier »
+  hooks/use-moderation.ts   analyse de chaque commentaire (cache par ID, 4 requêtes max en parallèle)
   utils/                    formatage des dates relatives
 ```
 
@@ -66,6 +69,18 @@ npx expo start      # puis ouvrir YouTube Shield sur l'iPhone (même Wi-Fi que l
 ```
 
 Il faut refaire un build uniquement si on ajoute une librairie native ou qu'on modifie `app.json` / `app.config.ts`.
+
+## Bouclier anti-commentaires offensants
+
+- Variables : `EXPO_PUBLIC_MODERATION_URL` et `EXPO_PUBLIC_MODERATION_API_KEY` dans `.env`.
+- Interrupteur en haut de la liste (activé par défaut) : seuls les commentaires **analysés et non offensants**
+  sont affichés ; ceux en cours d'analyse ou en erreur sont masqués par précaution.
+- Bouclier désactivé : tout est affiché, avec un badge « ⚠️ Offensant » sur les commentaires concernés.
+- Seul le commentaire principal de chaque fil est analysé (pas les réponses).
+
+> ⚠️ **Sécurité** : les variables `EXPO_PUBLIC_*` sont intégrées à l'app, la clé Azure est donc extractible.
+> OK pour un usage perso. Avant toute diffusion, mettre un proxy (ex. Azure Function) qui détient la clé :
+> il suffira de pointer `EXPO_PUBLIC_MODERATION_URL` dessus et de vider la clé.
 
 ## Scripts
 

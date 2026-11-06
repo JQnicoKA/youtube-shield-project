@@ -7,6 +7,7 @@ import { ReplyBox } from '@/components/reply-box';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
+import type { ModerationStatus } from '@/services/moderation';
 import { hasChannelReplied, type Comment, type CommentThread } from '@/services/youtube';
 import { formatRelativeTime } from '@/utils/relative-time';
 
@@ -14,7 +15,20 @@ type Props = {
   thread: CommentThread;
   myChannelId: string;
   onReply: (threadId: string, text: string) => Promise<unknown>;
+  moderation?: ModerationStatus;
 };
+
+function ModerationBadge({ status }: { status?: ModerationStatus }) {
+  if (status?.state !== 'done' || status.label !== 'OFF') return null;
+  const pct = Number.isFinite(status.scoreOff) ? ` · ${Math.round(status.scoreOff * 100)} %` : '';
+  return (
+    <View style={styles.offBadge}>
+      <ThemedText type="small" style={styles.offBadgeText}>
+        ⚠️ Offensant{pct}
+      </ThemedText>
+    </View>
+  );
+}
 
 function CommentBody({ comment, avatarSize }: { comment: Comment; avatarSize: number }) {
   return (
@@ -40,7 +54,7 @@ function CommentBody({ comment, avatarSize }: { comment: Comment; avatarSize: nu
   );
 }
 
-export const CommentCard = memo(function CommentCard({ thread, myChannelId, onReply }: Props) {
+export const CommentCard = memo(function CommentCard({ thread, myChannelId, onReply, moderation }: Props) {
   const [showReplies, setShowReplies] = useState(false);
   const [replying, setReplying] = useState(false);
   const replied = hasChannelReplied(thread, myChannelId);
@@ -59,6 +73,7 @@ export const CommentCard = memo(function CommentCard({ thread, myChannelId, onRe
         </ThemedText>
       </Pressable>
 
+      <ModerationBadge status={moderation} />
       <CommentBody comment={thread.comment} avatarSize={40} />
 
       <View style={styles.footer}>
@@ -115,5 +130,13 @@ const styles = StyleSheet.create({
   text: { fontSize: 15, lineHeight: 21, fontWeight: 400 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four, paddingLeft: 48 },
   badge: { color: '#30A46C', marginLeft: 'auto' },
+  offBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(229, 72, 77, 0.15)',
+    borderRadius: 999,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+  },
+  offBadgeText: { color: '#E5484D' },
   replies: { gap: Spacing.three, paddingLeft: 48, marginTop: Spacing.one },
 });
