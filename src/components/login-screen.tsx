@@ -1,5 +1,5 @@
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, useColorScheme } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -8,6 +8,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 export function LoginScreen() {
   const { signIn, error } = useAuth();
+  const isDark = useColorScheme() === 'dark';
 
   return (
     <ThemedView style={styles.container}>
@@ -19,7 +20,7 @@ export function LoginScreen() {
       </ThemedText>
       <GoogleSigninButton
         size={GoogleSigninButton.Size.Wide}
-        color={GoogleSigninButton.Color.Dark}
+        color={isDark ? GoogleSigninButton.Color.Light : GoogleSigninButton.Color.Dark}
         onPress={signIn}
       />
       {error && (

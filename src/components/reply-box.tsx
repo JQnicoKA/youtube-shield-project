@@ -47,7 +47,7 @@ export function ReplyBox({ onSubmit, onCancel }: Props) {
         autoFocus
         maxLength={MAX_LENGTH}
         editable={!sending}
-        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
       />
       {error && (
         <ThemedText type="small" style={styles.error}>

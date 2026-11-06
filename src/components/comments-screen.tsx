@@ -13,6 +13,7 @@ import {
 import { AccountModal } from '@/components/account-modal';
 import { Avatar } from '@/components/avatar';
 import { CommentCard } from '@/components/comment-card';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -102,9 +103,12 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
       <Stack.Screen
         options={{
           headerLeft: () => (
-            <Pressable onPress={() => setAccountOpen(true)} hitSlop={8} accessibilityLabel="Compte">
-              <Avatar uri={channel.avatarUrl} name={channel.title} size={30} />
-            </Pressable>
+            <View style={styles.headerLeft}>
+              <Pressable onPress={() => setAccountOpen(true)} hitSlop={8} accessibilityLabel="Compte">
+                <Avatar uri={channel.avatarUrl} name={channel.title} size={30} />
+              </Pressable>
+              <ThemeToggle />
+            </View>
           ),
         }}
       />
@@ -179,6 +183,7 @@ const styles = StyleSheet.create({
   centerText: { textAlign: 'center' },
   list: { padding: Spacing.three, gap: Spacing.three },
   footer: { marginVertical: Spacing.four },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   banner: {
     backgroundColor: 'rgba(229, 72, 77, 0.12)',
     borderRadius: Spacing.three,
