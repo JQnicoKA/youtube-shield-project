@@ -33,7 +33,7 @@ export function AccountModal({ visible, channel, email, onClose, onSignOut }: Pr
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       {/* Fond flouté (iOS). Sur Android, le flou ne traverse pas la fenêtre du Modal : fond assombri. */}
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={90} tint="systemThinMaterialDark" style={StyleSheet.absoluteFill} />
+        <BlurView intensity={60} tint="systemThinMaterialDark" style={StyleSheet.absoluteFill} />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.androidDim]} />
       )}
