@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 import { memo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
@@ -10,6 +11,9 @@ import { Accent, Spacing } from '@/constants/theme';
 import type { ModerationStatus } from '@/services/moderation';
 import { hasChannelReplied, type Comment, type CommentThread } from '@/services/youtube';
 import { formatRelativeTime } from '@/utils/relative-time';
+
+const BADGE_COLOR = '#30A46C';
+const BADGE_SIZE = 16;
 
 type Props = {
   thread: CommentThread;
@@ -105,14 +109,20 @@ export const CommentCard = memo(function CommentCard({
         )}
         <View style={styles.badges}>
           {thread.comment.likedByMe && (
-            <ThemedText type="small" style={styles.badge}>
-              💚 Liké
-            </ThemedText>
+            <SymbolView
+              name={{ ios: 'heart.fill', android: 'favorite' }}
+              size={BADGE_SIZE}
+              tintColor={BADGE_COLOR}
+              accessibilityLabel="Liké"
+            />
           )}
           {replied && (
-            <ThemedText type="small" style={styles.badge}>
-              ✓ Répondu
-            </ThemedText>
+            <SymbolView
+              name={{ ios: 'arrowshape.turn.up.left.fill', android: 'reply' }}
+              size={BADGE_SIZE}
+              tintColor={BADGE_COLOR}
+              accessibilityLabel="Répondu"
+            />
           )}
         </View>
       </View>
@@ -147,8 +157,7 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
   text: { fontSize: 15, lineHeight: 21, fontWeight: 400 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four, paddingLeft: 48 },
-  badges: { flexDirection: 'row', gap: Spacing.two, marginLeft: 'auto' },
-  badge: { color: '#30A46C' },
+  badges: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginLeft: 'auto' },
   offBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(229, 72, 77, 0.15)',
