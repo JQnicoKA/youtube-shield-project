@@ -47,22 +47,25 @@ cp .env.example .env
 # puis renseigner EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (et WEB pour Android)
 ```
 
-### 3. Lancer sur iPhone
+### 3. Lancer sur iPhone (EAS Build, sans Xcode)
 
-Prérequis : Node 22 (`nvm use`), Xcode sélectionné (`sudo xcode-select -s /Applications/Xcode-26.6.app`),
-iPhone branché en USB, **Mode développeur** activé (Réglages > Confidentialité et sécurité).
+Prérequis : Node 22 (`nvm use`), compte Apple Developer, `npx eas-cli@latest login`.
+Les ID clients Google sont aussi stockés dans les variables d'environnement EAS (`npx eas-cli@latest env:list`),
+car `.env` n'est pas envoyé aux serveurs de build.
 
 ```bash
-nvm use
-npm install
-npx expo run:ios --device
+npx eas-cli@latest device:create                                     # 1 fois : enregistrer l'iPhone (QR code)
+npx eas-cli@latest build --profile development --platform ios        # build cloud du "dev client"
 ```
 
-La première fois, ouvrir `ios/*.xcworkspace` dans Xcode pour choisir l'équipe de signature (*Signing & Capabilities*,
-un Apple ID gratuit suffit), puis sur l'iPhone : Réglages > Général > VPN et gestion de l'appareil > faire confiance au développeur.
-Avec un compte gratuit, l'app doit être réinstallée tous les 7 jours.
+Installer l'app via le lien/QR code donné à la fin du build (iOS 16+ : activer le Mode développeur
+dans Réglages > Confidentialité et sécurité). Ensuite, au quotidien :
 
-Les relances suivantes : `npx expo start` puis ouvrir l'app déjà installée sur l'iPhone.
+```bash
+npx expo start      # puis ouvrir YouTube Shield sur l'iPhone (même Wi-Fi que le Mac)
+```
+
+Il faut refaire un build uniquement si on ajoute une librairie native ou qu'on modifie `app.json` / `app.config.ts`.
 
 ## Scripts
 
