@@ -1,56 +1,73 @@
-# Welcome to your Expo app 👋
+# YouTube Shield
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App mobile (Expo / React Native) pour un YouTubeur : liste chronologique des commentaires de la chaîne,
+avec photo, nom, date et vidéo associée, et réponse directe publiée sur YouTube.
+Prochaine étape : filtrage des commentaires agressifs via une API Azure ML.
 
-## Get started
+## Architecture
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+src/
+  app/                      routes expo-router (index = login ou liste)
+  components/               UI (comment-card, reply-box, comments-screen, login-screen…)
+  hooks/use-comments.ts     TanStack Query : liste paginée + mutation de réponse
+  providers/auth-provider   état de connexion + chaîne YouTube connectée
+  services/auth/            Google Sign-In (scope youtube.force-ssl)
+  services/youtube/         client HTTP, appels API, mapping vers le modèle métier
+  utils/                    formatage des dates relatives
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Aucun backend pour la partie YouTube : l'app appelle l'API YouTube Data v3 avec le token OAuth de l'utilisateur.
 
-### Other setup steps
+### API YouTube utilisées (quota : 10 000 unités/jour)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Appel | Usage | Coût |
+|---|---|---|
+| `channels.list?mine=true` | chaîne connectée | 1 |
+| `commentThreads.list?allThreadsRelatedToChannelId` | commentaires (50/page, ordre chronologique) | 1 |
+| `videos.list` | titre et miniature des vidéos (mis en cache) | 1 |
+| `comments.insert` | publier une réponse | 50 |
 
-## Learn more
+## Mise en place
 
-To learn more about developing your project with Expo, look at the following resources:
+### 1. Google Cloud Console
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. **APIs & Services > Library** : activer **YouTube Data API v3**.
+2. **Google Auth Platform > Audience** : type *External*, statut *Testing*, ajouter le compte Google de la chaîne comme **utilisateur test**.
+3. **Data Access** : ajouter le scope `https://www.googleapis.com/auth/youtube.force-ssl`.
+4. **Clients > Create client > iOS** : bundle ID `com.jqnicoka.youtubeshield`.
+5. (Plus tard, pour Android) un client **Android** (package `com.jqnicoka.youtubeshield` + SHA-1) et un client **Web**.
 
-## Join the community
+> En mode *Testing*, Google demande de se reconnecter tous les 7 jours. C'est normal.
 
-Join our community of developers creating universal apps.
+### 2. Variables d'environnement
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+cp .env.example .env.local
+# puis renseigner EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (et WEB pour Android)
+```
+
+### 3. Lancer sur iPhone
+
+Prérequis : Node 22 (`nvm use`), Xcode sélectionné (`sudo xcode-select -s /Applications/Xcode-26.6.app`),
+iPhone branché en USB, **Mode développeur** activé (Réglages > Confidentialité et sécurité).
+
+```bash
+nvm use
+npm install
+npx expo run:ios --device
+```
+
+La première fois, ouvrir `ios/*.xcworkspace` dans Xcode pour choisir l'équipe de signature (*Signing & Capabilities*,
+un Apple ID gratuit suffit), puis sur l'iPhone : Réglages > Général > VPN et gestion de l'appareil > faire confiance au développeur.
+Avec un compte gratuit, l'app doit être réinstallée tous les 7 jours.
+
+Les relances suivantes : `npx expo start` puis ouvrir l'app déjà installée sur l'iPhone.
+
+## Scripts
+
+```bash
+npm test            # tests unitaires (Jest)
+npm run typecheck   # TypeScript
+npm run lint        # ESLint
+```
