@@ -103,13 +103,11 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
       <Stack.Screen
         options={{
           headerLeft: () => (
-            <View style={styles.headerLeft}>
-              <Pressable onPress={() => setAccountOpen(true)} hitSlop={8} accessibilityLabel="Compte">
-                <Avatar uri={channel.avatarUrl} name={channel.title} size={30} />
-              </Pressable>
-              <ThemeToggle />
-            </View>
+            <Pressable onPress={() => setAccountOpen(true)} hitSlop={8} accessibilityLabel="Compte">
+              <Avatar uri={channel.avatarUrl} name={channel.title} size={30} />
+            </Pressable>
           ),
+          headerRight: () => <ThemeToggle />,
         }}
       />
 
@@ -183,7 +181,6 @@ const styles = StyleSheet.create({
   centerText: { textAlign: 'center' },
   list: { padding: Spacing.three, gap: Spacing.three },
   footer: { marginVertical: Spacing.four },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   banner: {
     backgroundColor: 'rgba(229, 72, 77, 0.12)',
     borderRadius: Spacing.three,
