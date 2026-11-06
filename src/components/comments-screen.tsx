@@ -13,7 +13,6 @@ import {
 import { AccountModal } from '@/components/account-modal';
 import { Avatar } from '@/components/avatar';
 import { CommentCard } from '@/components/comment-card';
-import { ShieldBar } from '@/components/shield-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -49,8 +48,14 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
   const { mutateAsync: postReply } = useReplyToComment(channel.id);
 
   const threads = useMemo(() => query.data?.pages.flatMap((p) => p.threads) ?? [], [query.data]);
-  const shield = useShield(threads, query);
+  const shield = useShield(threads);
   const { getStatus } = shield;
+
+  // Commentaires dévoilés via « See anyway » (gardé ici : FlatList démonte les cartes hors écran).
+  const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
+  const onReveal = useCallback((threadId: string) => {
+    setRevealed((prev) => new Set(prev).add(threadId));
+  }, []);
 
   // Retour depuis YouTube (ex. après avoir liké) : on rafraîchit pour mettre à jour les badges.
   // Uniquement si on y est allé depuis l'app, pour ne pas consommer de quota à chaque réouverture.
@@ -84,10 +89,12 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         myChannelId={channel.id}
         onReply={onReply}
         moderation={getStatus(item)}
+        revealed={revealed.has(item.id)}
+        onReveal={onReveal}
         onOpenOnYouTube={onOpenOnYouTube}
       />
     ),
-    [channel.id, onReply, getStatus, onOpenOnYouTube],
+    [channel.id, onReply, getStatus, revealed, onReveal, onOpenOnYouTube],
   );
 
   return (
@@ -126,8 +133,8 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         </View>
       ) : (
         <FlatList
-          data={shield.visible}
-          extraData={shield.statuses}
+          data={threads}
+          extraData={[shield.statuses, revealed]}
           keyExtractor={(t) => t.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -140,42 +147,25 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
               onRefresh={() => void query.refetch()}
             />
           }
-          onEndReached={shield.onEndReached}
+          onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
           onEndReachedThreshold={0.5}
           onViewableItemsChanged={shield.onViewableItemsChanged}
           ListHeaderComponent={
-            shield.enabled ? (
-              <ShieldBar
-                enabled={shield.shieldOn}
-                onToggle={shield.setShieldOn}
-                stats={shield.stats}
-                fatalError={shield.fatalError}
-                onRetryErrors={shield.retryErrors}
-              />
+            shield.fatalError ? (
+              <Pressable onPress={shield.retryErrors} style={styles.banner}>
+                <ThemedText type="small" style={styles.bannerText}>
+                  Analyse des commentaires indisponible : {shield.fatalError}. Toucher pour réessayer.
+                </ThemedText>
+              </Pressable>
             ) : undefined
           }
           ListEmptyComponent={
-            shield.analyzing ? undefined : (
-              <ThemedText themeColor="textSecondary" style={styles.centerText}>
-                {threads.length > 0 ? 'Aucun commentaire à afficher.' : 'Aucun commentaire pour l\u2019instant.'}
-              </ThemedText>
-            )
+            <ThemedText themeColor="textSecondary" style={styles.centerText}>
+              Aucun commentaire pour l&apos;instant.
+            </ThemedText>
           }
           ListFooterComponent={
-            query.isFetchingNextPage || (shield.shieldOn && shield.analyzing) ? (
-              <View style={styles.footer}>
-                <ActivityIndicator />
-                {shield.shieldOn && shield.analyzing && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Analyse des commentaires…
-                  </ThemedText>
-                )}
-              </View>
-            ) : shield.canAnalyzeMore ? (
-              <Pressable onPress={shield.analyzeMore} style={styles.footer}>
-                <ThemedText type="linkPrimary">Analyser la suite</ThemedText>
-              </Pressable>
-            ) : undefined
+            query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} /> : undefined
           }
         />
       )}
@@ -188,5 +178,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.three, padding: Spacing.four },
   centerText: { textAlign: 'center' },
   list: { padding: Spacing.three, gap: Spacing.three },
-  footer: { marginVertical: Spacing.four, alignItems: 'center', gap: Spacing.two },
+  footer: { marginVertical: Spacing.four },
+  banner: {
+    backgroundColor: 'rgba(229, 72, 77, 0.12)',
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+  },
+  bannerText: { color: '#E5484D' },
 });

@@ -3,7 +3,7 @@
 App mobile (Expo / React Native) pour un YouTubeur : liste chronologique des commentaires de la chaîne,
 avec photo, nom, date et vidéo associée, et réponse directe publiée sur YouTube.
 Bouclier : chaque commentaire est analysé par un modèle Azure ML (OFF = offensant, NOT = non offensant)
-et les commentaires offensants peuvent être masqués.
+et les commentaires offensants sont floutés, avec un bouton « See anyway » pour les afficher.
 
 ## Architecture
 
@@ -15,9 +15,9 @@ src/
   providers/auth-provider   état de connexion + chaîne YouTube connectée
   services/auth/            Google Sign-In (scope youtube.force-ssl)
   services/youtube/         client HTTP, appels API, mapping vers le modèle métier
-  services/moderation/      appel du modèle Azure ML, limiteur de concurrence, filtre « bouclier »
+  services/moderation/      appel du modèle Azure ML, limiteur de concurrence, règle de floutage
   hooks/use-moderation.ts   analyse de chaque commentaire (cache par ID, 4 requêtes max en parallèle)
-  hooks/use-shield.ts       analyse par lots au fil du scroll + filtrage
+  hooks/use-shield.ts       analyse par lots au fil du scroll
   utils/                    formatage des dates relatives
 ```
 
@@ -74,13 +74,13 @@ Il faut refaire un build uniquement si on ajoute une librairie native ou qu'on m
 ## Bouclier anti-commentaires offensants
 
 - Variables : `EXPO_PUBLIC_MODERATION_URL` et `EXPO_PUBLIC_MODERATION_API_KEY` dans `.env`.
-- Interrupteur en haut de la liste (activé par défaut) : seuls les commentaires **analysés et non offensants**
-  sont affichés ; ceux en cours d'analyse ou en erreur sont masqués par précaution.
-- Bouclier désactivé : tout est affiché, avec un badge « ⚠️ Offensant » sur les commentaires concernés.
-- Analyse **par lots de 10**, au fil du scroll : le lot suivant part quand on arrive en bas de la liste.
-  Si trop de commentaires sont masqués pour remplir l'écran, les lots s'enchaînent seuls (50 analyses max,
-  ensuite bouton « Analyser la suite »). Une nouvelle page YouTube n'est chargée qu'une fois tout analysé.
-- Clé refusée (401/403) : plus aucun envoi, message explicite dans la barre du bouclier.
+- Tous les commentaires restent dans la liste. Les **offensants sont floutés** (avatar, nom, texte) avec un
+  bouton **« See anyway »** ; une fois dévoilés, un badge « ⚠️ Offensant · xx % » s'affiche.
+- Un commentaire est aussi flouté **pendant son analyse** (quelques instants), pour ne jamais afficher une insulte
+  avant le verdict. En cas d'erreur d'analyse, il est affiché normalement.
+- Analyse **par lots de 10** : les commentaires visibles à l'écran + un lot d'avance.
+- Clé refusée (401/403) : plus aucun envoi, bandeau d'erreur en haut de la liste.
+- Intensité du flou : `CONTENT_BLUR` dans `src/components/comment-card.tsx`.
 - Seul le commentaire principal de chaque fil est analysé (pas les réponses).
 
 > ⚠️ **Sécurité** : les variables `EXPO_PUBLIC_*` sont intégrées à l'app, la clé Azure est donc extractible.

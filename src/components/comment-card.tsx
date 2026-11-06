@@ -1,25 +1,31 @@
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { memo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { memo, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ReplyBox } from '@/components/reply-box';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
-import type { ModerationStatus } from '@/services/moderation';
+import { blurReason, type BlurReason, type ModerationStatus } from '@/services/moderation';
 import { hasChannelReplied, type Comment, type CommentThread } from '@/services/youtube';
 import { formatRelativeTime } from '@/utils/relative-time';
 
 const BADGE_COLOR = '#30A46C';
 const BADGE_SIZE = 16;
+/** Intensité du flou sur les commentaires offensants (0-100). */
+const CONTENT_BLUR = 80;
 
 type Props = {
   thread: CommentThread;
   myChannelId: string;
   onReply: (threadId: string, text: string) => Promise<unknown>;
   moderation?: ModerationStatus;
+  /** L'utilisateur a touché « See anyway » sur ce commentaire. */
+  revealed: boolean;
+  onReveal: (threadId: string) => void;
   /** Appelé quand on ouvre le commentaire dans YouTube (pour rafraîchir au retour). */
   onOpenOnYouTube?: () => void;
 };
@@ -32,6 +38,53 @@ function ModerationBadge({ status }: { status?: ModerationStatus }) {
       <ThemedText type="small" style={styles.offBadgeText}>
         ⚠️ Offensant{pct}
       </ThemedText>
+    </View>
+  );
+}
+
+/** Floute son contenu (avatar, nom, texte) tant que `reason` n'est pas null. */
+function SensitiveContent({
+  reason,
+  onReveal,
+  children,
+}: {
+  reason: BlurReason;
+  onReveal: () => void;
+  children: ReactNode;
+}) {
+  if (!reason) return <>{children}</>;
+
+  return (
+    <View style={styles.sensitive}>
+      {/* Le contenu est rendu (pour garder la hauteur) mais masqué aux lecteurs d'écran */}
+      <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        {children}
+      </View>
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={CONTENT_BLUR} tint="systemThinMaterial" style={styles.cover} />
+      ) : (
+        <ThemedView type="backgroundSelected" style={styles.cover} />
+      )}
+      <View style={[styles.cover, styles.coverContent]}>
+        {reason === 'analyzing' ? (
+          <ActivityIndicator accessibilityLabel="Analyse du commentaire" />
+        ) : (
+          <>
+            <ThemedText type="small" themeColor="textSecondary">
+              Commentaire potentiellement offensant
+            </ThemedText>
+            <Pressable
+              onPress={onReveal}
+              hitSlop={8}
+              style={({ pressed }) => [styles.reveal, pressed && styles.pressed]}>
+              <SymbolView name={{ ios: 'eye', android: 'visibility' }} size={16} tintColor="#fff" />
+              <ThemedText type="smallBold" style={styles.revealText}>
+                See anyway
+              </ThemedText>
+            </Pressable>
+          </>
+        )}
+      </View>
     </View>
   );
 }
@@ -65,12 +118,15 @@ export const CommentCard = memo(function CommentCard({
   myChannelId,
   onReply,
   moderation,
+  revealed,
+  onReveal,
   onOpenOnYouTube,
 }: Props) {
   const [showReplies, setShowReplies] = useState(false);
   const [replying, setReplying] = useState(false);
   const replied = hasChannelReplied(thread, myChannelId);
   const { video } = thread;
+  const reason = blurReason(moderation, revealed);
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
@@ -88,8 +144,11 @@ export const CommentCard = memo(function CommentCard({
         </ThemedText>
       </Pressable>
 
-      <ModerationBadge status={moderation} />
-      <CommentBody comment={thread.comment} avatarSize={40} />
+      {/* Badge visible seulement une fois le commentaire dévoilé */}
+      {!reason && <ModerationBadge status={moderation} />}
+      <SensitiveContent reason={reason} onReveal={() => onReveal(thread.id)}>
+        <CommentBody comment={thread.comment} avatarSize={40} />
+      </SensitiveContent>
 
       <View style={styles.footer}>
         {thread.canReply && !replying && (
@@ -166,5 +225,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.half,
   },
   offBadgeText: { color: '#E5484D' },
+  sensitive: { minHeight: 96, borderRadius: Spacing.two, overflow: 'hidden' },
+  cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  coverContent: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.two },
+  reveal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + Spacing.half,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  revealText: { color: '#fff' },
+  pressed: { opacity: 0.75 },
   replies: { gap: Spacing.three, paddingLeft: 48, marginTop: Spacing.one },
 });

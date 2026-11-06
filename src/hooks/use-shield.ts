@@ -3,88 +3,47 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlatListProps } from 'react-native';
 
 import { useModeration } from '@/hooks/use-moderation';
-import { filterByModeration } from '@/services/moderation';
-import {
-  BATCH_SIZE,
-  nextStep,
-  shouldAutoAdvance,
-  type ProgressState,
-} from '@/services/moderation/progress';
+import type { ModerationStatus } from '@/services/moderation';
 import type { CommentThread } from '@/services/youtube';
 
 type ViewableItemsChanged = NonNullable<FlatListProps<CommentThread>['onViewableItemsChanged']>;
 
-type Pagination = {
-  hasNextPage: boolean;
-  isFetchingNextPage: boolean;
-  fetchNextPage: () => unknown;
-};
+/** Nombre de commentaires envoyés au modèle par lot. */
+const BATCH_SIZE = 10;
+const PENDING: ModerationStatus = { state: 'pending' };
 
 /**
- * Bouclier : analyse les commentaires par lots, au fil du scroll, et filtre les offensants.
- *
- * - Bouclier ON : on n'affiche que les commentaires analysés et sains. Quand on arrive en bas
- *   (ou que l'écran n'est pas rempli), on analyse le lot suivant, puis on charge une nouvelle
- *   page YouTube seulement quand tous les commentaires chargés ont été analysés.
- * - Bouclier OFF : tout s'affiche, l'analyse suit ce qui est visible à l'écran (pour les badges).
+ * Analyse les commentaires au fil du scroll : ceux visibles à l'écran + un lot d'avance.
+ * Rien n'est filtré : c'est la carte qui floute les commentaires offensants.
  */
-export function useShield(threads: CommentThread[], pagination: Pagination) {
+export function useShield(threads: CommentThread[]) {
   const queryClient = useQueryClient();
-  const [shieldOn, setShieldOn] = useState(true);
   const [analyzeLimit, setAnalyzeLimit] = useState(BATCH_SIZE);
 
   const analyzed = useMemo(() => threads.slice(0, analyzeLimit), [threads, analyzeLimit]);
-  const moderation = useModeration(analyzed);
-  const active = moderation.enabled && shieldOn;
+  const { statuses, enabled, fatalError } = useModeration(analyzed);
 
-  const { visible, stats } = useMemo(
-    () =>
-      active
-        ? filterByModeration(analyzed, moderation.getStatus, true)
-        : filterByModeration(threads, moderation.getStatus, false),
-    [active, analyzed, threads, moderation.getStatus],
-  );
-
-  const progress: ProgressState = {
-    analyzeLimit,
-    loaded: threads.length,
-    settled: moderation.settled,
-    blocked: !!moderation.fatalError,
-    hasNextPage: pagination.hasNextPage,
-    isFetchingNextPage: pagination.isFetchingNextPage,
-  };
-
-  const { fetchNextPage } = pagination;
-  const advance = useCallback(
-    (step: ReturnType<typeof nextStep>) => {
-      if (step === 'analyzeMore') setAnalyzeLimit((l) => l + BATCH_SIZE);
-      if (step === 'fetchPage') fetchNextPage();
+  /**
+   * Statut d'un fil. Un fil pas encore envoyé au modèle est « en attente » (donc flouté),
+   * sauf si la modération est bloquée (clé refusée) : on affiche alors tout normalement.
+   */
+  const getStatus = useCallback(
+    (t: CommentThread): ModerationStatus | undefined => {
+      if (!enabled) return undefined;
+      return statuses.get(t.comment.id) ?? (fatalError ? undefined : PENDING);
     },
-    [fetchNextPage],
+    [enabled, statuses, fatalError],
   );
 
-  // Écran pas assez rempli (beaucoup de commentaires masqués) : on enchaîne le lot suivant.
-  const autoAdvance = active && shouldAutoAdvance({ ...progress, visible: visible.length });
-  const autoStep = autoAdvance ? nextStep(progress) : 'wait';
+  // Après une erreur bloquante, on n'envoie plus de nouveaux lots.
+  const blockedRef = useRef(false);
   useEffect(() => {
-    // On réagit à la fin d'un lot d'analyse (résultat des requêtes) : setState voulu ici.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (autoStep !== 'wait') advance(autoStep);
-  }, [autoStep, advance]);
+    blockedRef.current = !!fatalError;
+  }, [fatalError]);
 
-  const onEndReached = () => {
-    if (active) advance(nextStep(progress));
-    else if (pagination.hasNextPage && !pagination.isFetchingNextPage) fetchNextPage();
-  };
-
-  // Bouclier OFF : on analyse ce qui défile à l'écran, avec un lot d'avance.
-  // (FlatList exige un onViewableItemsChanged stable, d'où la ref.)
-  const activeRef = useRef(active);
-  useEffect(() => {
-    activeRef.current = active;
-  }, [active]);
+  // FlatList exige un onViewableItemsChanged stable (d'où useCallback sans dépendances + ref).
   const onViewableItemsChanged = useCallback<ViewableItemsChanged>(({ viewableItems }) => {
-    if (activeRef.current) return;
+    if (blockedRef.current) return;
     const maxIndex = Math.max(-1, ...viewableItems.map((v) => v.index ?? -1));
     if (maxIndex < 0) return;
     const needed = Math.ceil((maxIndex + 1) / BATCH_SIZE) * BATCH_SIZE + BATCH_SIZE;
@@ -95,24 +54,5 @@ export function useShield(threads: CommentThread[], pagination: Pagination) {
     queryClient.refetchQueries({ queryKey: ['moderation'], predicate: (q) => q.state.status === 'error' });
   }, [queryClient]);
 
-  /** Il reste des commentaires à analyser et l'utilisateur peut le demander explicitement. */
-  const canAnalyzeMore = active && nextStep(progress) !== 'wait';
-  const analyzing = moderation.enabled && !moderation.settled;
-
-  return {
-    enabled: moderation.enabled,
-    shieldOn,
-    setShieldOn,
-    visible,
-    stats,
-    statuses: moderation.statuses,
-    getStatus: moderation.getStatus,
-    fatalError: moderation.fatalError,
-    analyzing,
-    canAnalyzeMore,
-    analyzeMore: () => advance(nextStep(progress)),
-    onEndReached,
-    onViewableItemsChanged,
-    retryErrors,
-  };
+  return { statuses, getStatus, fatalError, onViewableItemsChanged, retryErrors };
 }

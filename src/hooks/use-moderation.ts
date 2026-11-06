@@ -16,8 +16,6 @@ const isFatal = (e: unknown) => e instanceof ModerationError && (e.status === 40
 
 export type ModerationSummary = {
   statuses: Map<string, ModerationStatus>;
-  /** Aucune analyse en cours. */
-  settled: boolean;
   /** Message de la première erreur bloquante (clé refusée), s'il y en a une. */
   fatalError?: string;
 };
@@ -31,7 +29,6 @@ export function useModeration(threads: CommentThread[]) {
   const combine = useCallback(
     (results: UseQueryResult<ModerationResult, Error>[]): ModerationSummary => {
       const statuses = new Map<string, ModerationStatus>();
-      let settled = true;
       let fatalError: string | undefined;
 
       results.forEach((r, i) => {
@@ -44,10 +41,9 @@ export function useModeration(threads: CommentThread[]) {
           statuses.set(id, { state: 'error', message: r.error.message, fatal });
         } else {
           statuses.set(id, { state: 'pending' });
-          if (r.fetchStatus === 'fetching') settled = false;
         }
       });
-      return { statuses, settled, fatalError };
+      return { statuses, fatalError };
     },
     [threads],
   );

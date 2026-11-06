@@ -16,4 +16,4 @@ const limit = createLimiter(MAX_CONCURRENT_REQUESTS);
 export const classifyComment = (text: string) => limit(() => classifyRaw(text));
 
 export { ModerationError, type ModerationLabel, type ModerationResult } from './client';
-export { filterByModeration, type FilterStats, type ModerationStatus } from './filter';
+export { blurReason, type BlurReason, type ModerationStatus } from './status';
