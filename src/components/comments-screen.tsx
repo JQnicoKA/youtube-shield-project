@@ -1,6 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -10,9 +9,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useCommentThreads, useReplyToComment } from '@/hooks/use-comments';
-import { useModeration } from '@/hooks/use-moderation';
+import { useShield } from '@/hooks/use-shield';
 import { useAuth } from '@/providers/auth-provider';
-import { filterByModeration } from '@/services/moderation';
 import { YouTubeApiError, type Channel, type CommentThread } from '@/services/youtube';
 
 function errorMessage(error: unknown): string {
@@ -39,21 +37,10 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
   const { signOut } = useAuth();
   const query = useCommentThreads(channel.id);
   const { mutateAsync: postReply } = useReplyToComment(channel.id);
-  const queryClient = useQueryClient();
-  const [shieldOn, setShieldOn] = useState(true);
 
   const threads = useMemo(() => query.data?.pages.flatMap((p) => p.threads) ?? [], [query.data]);
-  const moderation = useModeration(threads);
-  const { getStatus } = moderation;
-
-  const { visible, stats } = useMemo(
-    () => filterByModeration(threads, moderation.getStatus, moderation.enabled && shieldOn),
-    [threads, moderation.getStatus, moderation.enabled, shieldOn],
-  );
-
-  const retryModerationErrors = useCallback(() => {
-    queryClient.refetchQueries({ queryKey: ['moderation'], predicate: (q) => q.state.status === 'error' });
-  }, [queryClient]);
+  const shield = useShield(threads, query);
+  const { getStatus } = shield;
 
   const onReply = useCallback(
     (threadId: string, text: string) =>
@@ -101,8 +88,8 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         </View>
       ) : (
         <FlatList
-          data={visible}
-          extraData={moderation.statuses}
+          data={shield.visible}
+          extraData={shield.statuses}
           keyExtractor={(t) => t.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -115,25 +102,42 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
               onRefresh={() => void query.refetch()}
             />
           }
-          onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
+          onEndReached={shield.onEndReached}
           onEndReachedThreshold={0.5}
+          onViewableItemsChanged={shield.onViewableItemsChanged}
           ListHeaderComponent={
-            moderation.enabled ? (
+            shield.enabled ? (
               <ShieldBar
-                enabled={shieldOn}
-                onToggle={setShieldOn}
-                stats={stats}
-                onRetryErrors={retryModerationErrors}
+                enabled={shield.shieldOn}
+                onToggle={shield.setShieldOn}
+                stats={shield.stats}
+                fatalError={shield.fatalError}
+                onRetryErrors={shield.retryErrors}
               />
             ) : undefined
           }
           ListEmptyComponent={
-            <ThemedText themeColor="textSecondary" style={styles.centerText}>
-              {threads.length > 0 ? 'Aucun commentaire à afficher.' : 'Aucun commentaire pour l\u2019instant.'}
-            </ThemedText>
+            shield.analyzing ? undefined : (
+              <ThemedText themeColor="textSecondary" style={styles.centerText}>
+                {threads.length > 0 ? 'Aucun commentaire à afficher.' : 'Aucun commentaire pour l\u2019instant.'}
+              </ThemedText>
+            )
           }
           ListFooterComponent={
-            query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} /> : undefined
+            query.isFetchingNextPage || (shield.shieldOn && shield.analyzing) ? (
+              <View style={styles.footer}>
+                <ActivityIndicator />
+                {shield.shieldOn && shield.analyzing && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Analyse des commentaires…
+                  </ThemedText>
+                )}
+              </View>
+            ) : shield.canAnalyzeMore ? (
+              <Pressable onPress={shield.analyzeMore} style={styles.footer}>
+                <ThemedText type="linkPrimary">Analyser la suite</ThemedText>
+              </Pressable>
+            ) : undefined
           }
         />
       )}
@@ -146,5 +150,5 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.three, padding: Spacing.four },
   centerText: { textAlign: 'center' },
   list: { padding: Spacing.three, gap: Spacing.three },
-  footer: { marginVertical: Spacing.four },
+  footer: { marginVertical: Spacing.four, alignItems: 'center', gap: Spacing.two },
 });

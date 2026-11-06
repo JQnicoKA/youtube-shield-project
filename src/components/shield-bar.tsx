@@ -9,10 +9,12 @@ type Props = {
   enabled: boolean;
   onToggle: (value: boolean) => void;
   stats: FilterStats;
+  /** Erreur bloquante (ex. clé Azure refusée) : affichée même bouclier désactivé. */
+  fatalError?: string;
   onRetryErrors: () => void;
 };
 
-export function ShieldBar({ enabled, onToggle, stats, onRetryErrors }: Props) {
+export function ShieldBar({ enabled, onToggle, stats, fatalError, onRetryErrors }: Props) {
   const parts = [
     stats.hidden > 0 && `${stats.hidden} masqué${stats.hidden > 1 ? 's' : ''}`,
     stats.pending > 0 && `${stats.pending} en analyse`,
@@ -31,12 +33,21 @@ export function ShieldBar({ enabled, onToggle, stats, onRetryErrors }: Props) {
         </View>
         <Switch value={enabled} onValueChange={onToggle} trackColor={{ true: Accent }} />
       </View>
-      {enabled && stats.errors > 0 && (
+      {fatalError ? (
         <Pressable onPress={onRetryErrors} hitSlop={8}>
           <ThemedText type="small" style={styles.error}>
-            {stats.errors} non analysé{stats.errors > 1 ? 's' : ''} (erreur) · Réessayer
+            Analyse impossible : {fatalError}. Vérifie EXPO_PUBLIC_MODERATION_API_KEY · Réessayer
           </ThemedText>
         </Pressable>
+      ) : (
+        enabled &&
+        stats.errors > 0 && (
+          <Pressable onPress={onRetryErrors} hitSlop={8}>
+            <ThemedText type="small" style={styles.error}>
+              {stats.errors} non analysé{stats.errors > 1 ? 's' : ''} (erreur) · Réessayer
+            </ThemedText>
+          </Pressable>
+        )
       )}
     </ThemedView>
   );

@@ -2,7 +2,8 @@ import type { ModerationResult } from './client';
 
 export type ModerationStatus =
   | { state: 'pending' }
-  | { state: 'error'; message: string }
+  /** fatal = clé refusée (401/403) : inutile de réessayer automatiquement. */
+  | { state: 'error'; message: string; fatal: boolean }
   | ({ state: 'done' } & ModerationResult);
 
 export type FilterStats = {

@@ -5,7 +5,7 @@ const statuses: Record<string, ModerationStatus> = {
   ok: { state: 'done', label: 'NOT', scoreOff: 0.02, threshold: 0.15 },
   off: { state: 'done', label: 'OFF', scoreOff: 0.8, threshold: 0.15 },
   wait: { state: 'pending' },
-  err: { state: 'error', message: 'boom' },
+  err: { state: 'error', message: 'boom', fatal: false },
 };
 const items = ['ok', 'off', 'wait', 'err', 'unknown'];
 const get = (id: string) => statuses[id];
