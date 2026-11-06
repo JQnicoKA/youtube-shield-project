@@ -1,5 +1,7 @@
 import { Appearance, type ColorSchemeName } from 'react-native';
 
+import { isNativeStorageAvailable } from './native-storage';
+
 const STORAGE_KEY = 'preferences.colorScheme';
 
 type Storage = {
@@ -7,18 +9,20 @@ type Storage = {
   setItem: (key: string, value: string) => Promise<void>;
 };
 
+let storage: Storage | null | undefined;
+
 /**
  * AsyncStorage est un module natif : s'il n'est pas encore dans la build installée,
- * son import échoue. On le charge donc à la demande, et sans lui le choix n'est
- * simplement pas mémorisé entre deux lancements.
+ * on ne l'importe pas du tout, et le choix n'est simplement pas mémorisé entre deux lancements.
  */
 function getStorage(): Storage | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@react-native-async-storage/async-storage').default as Storage;
-  } catch {
-    return null;
+  if (storage === undefined) {
+    storage = isNativeStorageAvailable()
+      ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+        (require('@react-native-async-storage/async-storage').default as Storage)
+      : null;
   }
+  return storage;
 }
 
 /** Applique le thème choisi lors d'une session précédente (sinon : celui de l'iPhone). */

@@ -2,6 +2,8 @@ import { Appearance } from 'react-native';
 
 import { restoreColorScheme, setColorScheme } from '../color-scheme';
 
+jest.mock('../native-storage', () => ({ isNativeStorageAvailable: () => true }));
+
 const mockStorage = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
