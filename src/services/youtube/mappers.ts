@@ -56,7 +56,8 @@ export function mapChannel(api: ApiChannel): Channel {
   return {
     id: api.id,
     title: api.snippet.title,
-    avatarUrl: (t.default ?? t.medium ?? t.high)?.url,
+    // medium (240 px) : net aussi bien dans l'en-tête que dans la fenêtre du compte
+    avatarUrl: (t.medium ?? t.high ?? t.default)?.url,
   };
 }
 

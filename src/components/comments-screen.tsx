@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { AccountModal } from '@/components/account-modal';
 import { Avatar } from '@/components/avatar';
 import { CommentCard } from '@/components/comment-card';
 import { ShieldBar } from '@/components/shield-bar';
@@ -42,7 +43,8 @@ function toReplyError(error: unknown): Error {
 }
 
 export function CommentsScreen({ channel }: { channel: Channel }) {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
   const query = useCommentThreads(channel.id);
   const { mutateAsync: postReply } = useReplyToComment(channel.id);
 
@@ -92,12 +94,22 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
     <ThemedView style={styles.flex}>
       <Stack.Screen
         options={{
-          headerLeft: () => <Avatar uri={channel.avatarUrl} name={channel.title} size={28} />,
-          headerRight: () => (
-            <Pressable onPress={signOut} hitSlop={8}>
-              <ThemedText type="small">Déconnexion</ThemedText>
+          headerLeft: () => (
+            <Pressable onPress={() => setAccountOpen(true)} hitSlop={8} accessibilityLabel="Compte">
+              <Avatar uri={channel.avatarUrl} name={channel.title} size={30} />
             </Pressable>
           ),
+        }}
+      />
+
+      <AccountModal
+        visible={accountOpen}
+        channel={channel}
+        email={user?.user.email}
+        onClose={() => setAccountOpen(false)}
+        onSignOut={async () => {
+          setAccountOpen(false);
+          await signOut();
         }}
       />
 
