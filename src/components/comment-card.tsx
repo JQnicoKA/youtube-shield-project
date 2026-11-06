@@ -25,19 +25,33 @@ type Props = {
   moderation?: ModerationStatus;
   /** L'utilisateur a touché « See anyway » sur ce commentaire. */
   revealed: boolean;
-  onReveal: (threadId: string) => void;
+  /** « See anyway » (true) ou « Flouter » (false). */
+  onRevealChange: (threadId: string, revealed: boolean) => void;
   /** Appelé quand on ouvre le commentaire dans YouTube (pour rafraîchir au retour). */
   onOpenOnYouTube?: () => void;
 };
 
-function ModerationBadge({ status }: { status?: ModerationStatus }) {
+/** Affiché sur un commentaire offensant dévoilé : score + bouton pour le reflouter. */
+function ModerationBadge({ status, onBlur }: { status?: ModerationStatus; onBlur: () => void }) {
   if (status?.state !== 'done' || status.label !== 'OFF') return null;
   const pct = Number.isFinite(status.scoreOff) ? ` · ${Math.round(status.scoreOff * 100)} %` : '';
   return (
-    <View style={styles.offBadge}>
-      <ThemedText type="small" style={styles.offBadgeText}>
-        ⚠️ Offensant{pct}
-      </ThemedText>
+    <View style={styles.offRow}>
+      <View style={styles.offBadge}>
+        <ThemedText type="small" style={styles.offBadgeText}>
+          ⚠️ Offensant{pct}
+        </ThemedText>
+      </View>
+      <Pressable
+        onPress={onBlur}
+        hitSlop={8}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.blurButton, pressed && styles.pressed]}>
+        <SymbolView name={{ ios: 'eye.slash', android: 'visibility_off' }} size={14} tintColor="#E5484D" />
+        <ThemedText type="small" style={styles.offBadgeText}>
+          Flouter
+        </ThemedText>
+      </Pressable>
     </View>
   );
 }
@@ -119,7 +133,7 @@ export const CommentCard = memo(function CommentCard({
   onReply,
   moderation,
   revealed,
-  onReveal,
+  onRevealChange,
   onOpenOnYouTube,
 }: Props) {
   const [showReplies, setShowReplies] = useState(false);
@@ -145,8 +159,10 @@ export const CommentCard = memo(function CommentCard({
       </Pressable>
 
       {/* Badge visible seulement une fois le commentaire dévoilé */}
-      {!reason && <ModerationBadge status={moderation} />}
-      <SensitiveContent reason={reason} onReveal={() => onReveal(thread.id)}>
+      {!reason && (
+        <ModerationBadge status={moderation} onBlur={() => onRevealChange(thread.id, false)} />
+      )}
+      <SensitiveContent reason={reason} onReveal={() => onRevealChange(thread.id, true)}>
         <CommentBody comment={thread.comment} avatarSize={40} />
       </SensitiveContent>
 
@@ -225,6 +241,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.half,
   },
   offBadgeText: { color: '#E5484D' },
+  offRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  blurButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    borderWidth: 1,
+    borderColor: 'rgba(229, 72, 77, 0.5)',
+    borderRadius: 999,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+  },
   sensitive: { minHeight: 96, borderRadius: Spacing.two, overflow: 'hidden' },
   cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   coverContent: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.two },

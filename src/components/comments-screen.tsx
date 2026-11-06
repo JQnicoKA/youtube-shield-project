@@ -54,8 +54,13 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
 
   // Commentaires dévoilés via « See anyway » (gardé ici : FlatList démonte les cartes hors écran).
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
-  const onReveal = useCallback((threadId: string) => {
-    setRevealed((prev) => new Set(prev).add(threadId));
+  const onRevealChange = useCallback((threadId: string, show: boolean) => {
+    setRevealed((prev) => {
+      const next = new Set(prev);
+      if (show) next.add(threadId);
+      else next.delete(threadId);
+      return next;
+    });
   }, []);
 
   // Retour depuis YouTube (ex. après avoir liké) : on rafraîchit pour mettre à jour les badges.
@@ -91,11 +96,11 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         onReply={onReply}
         moderation={getStatus(item)}
         revealed={revealed.has(item.id)}
-        onReveal={onReveal}
+        onRevealChange={onRevealChange}
         onOpenOnYouTube={onOpenOnYouTube}
       />
     ),
-    [channel.id, onReply, getStatus, revealed, onReveal, onOpenOnYouTube],
+    [channel.id, onReply, getStatus, revealed, onRevealChange, onOpenOnYouTube],
   );
 
   return (
