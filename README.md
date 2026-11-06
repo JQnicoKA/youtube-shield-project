@@ -43,7 +43,7 @@ Aucun backend pour la partie YouTube : l'app appelle l'API YouTube Data v3 avec 
 ### 2. Variables d'environnement
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 # puis renseigner EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (et WEB pour Android)
 ```
 
