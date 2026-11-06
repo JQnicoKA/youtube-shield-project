@@ -1,6 +1,14 @@
 import { Stack } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  ActivityIndicator,
+  AppState,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { CommentCard } from '@/components/comment-card';
@@ -42,6 +50,23 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
   const shield = useShield(threads, query);
   const { getStatus } = shield;
 
+  // Retour depuis YouTube (ex. après avoir liké) : on rafraîchit pour mettre à jour les badges.
+  // Uniquement si on y est allé depuis l'app, pour ne pas consommer de quota à chaque réouverture.
+  const openedYouTube = useRef(false);
+  const onOpenOnYouTube = useCallback(() => {
+    openedYouTube.current = true;
+  }, []);
+  const { refetch } = query;
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && openedYouTube.current) {
+        openedYouTube.current = false;
+        refetch();
+      }
+    });
+    return () => sub.remove();
+  }, [refetch]);
+
   const onReply = useCallback(
     (threadId: string, text: string) =>
       postReply({ threadId, text }).catch((e) => {
@@ -57,9 +82,10 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         myChannelId={channel.id}
         onReply={onReply}
         moderation={getStatus(item)}
+        onOpenOnYouTube={onOpenOnYouTube}
       />
     ),
-    [channel.id, onReply, getStatus],
+    [channel.id, onReply, getStatus, onOpenOnYouTube],
   );
 
   return (

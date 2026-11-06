@@ -41,6 +41,17 @@ describe('mapThread', () => {
   });
 });
 
+describe('likedByMe', () => {
+  it('vaut true quand le compte connecté a liké (viewerRating = like)', () => {
+    const thread = mapThread(apiThread('t1', 'v1'));
+    expect(thread.comment.likedByMe).toBe(false);
+
+    const liked = apiThread('t2', 'v1');
+    liked.snippet.topLevelComment.snippet.viewerRating = 'like';
+    expect(mapThread(liked).comment.likedByMe).toBe(true);
+  });
+});
+
 describe('hasChannelReplied', () => {
   const thread = mapThread(
     apiThread('t1', 'v1', [apiComment('r1', { authorChannelId: { value: 'UC-me' } })]),

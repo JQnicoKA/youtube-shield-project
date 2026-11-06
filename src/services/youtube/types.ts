@@ -10,6 +10,8 @@ export type ApiCommentSnippet = {
   authorChannelUrl?: string;
   authorChannelId?: { value: string };
   likeCount: number;
+  /** Note donnée par le compte connecté ("like" ou "none"). */
+  viewerRating?: string;
   publishedAt: string;
   updatedAt: string;
 };
@@ -70,6 +72,8 @@ export type Comment = {
   text: string;
   author: Author;
   likeCount: number;
+  /** Le compte connecté (la chaîne) a liké ce commentaire. */
+  likedByMe: boolean;
   publishedAt: string;
 };
 

@@ -21,6 +21,7 @@ export function mapComment(api: ApiComment): Comment {
       channelUrl: s.authorChannelUrl,
     },
     likeCount: s.likeCount ?? 0,
+    likedByMe: s.viewerRating === 'like',
     publishedAt: s.publishedAt,
   };
 }

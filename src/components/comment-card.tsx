@@ -16,6 +16,8 @@ type Props = {
   myChannelId: string;
   onReply: (threadId: string, text: string) => Promise<unknown>;
   moderation?: ModerationStatus;
+  /** Appelé quand on ouvre le commentaire dans YouTube (pour rafraîchir au retour). */
+  onOpenOnYouTube?: () => void;
 };
 
 function ModerationBadge({ status }: { status?: ModerationStatus }) {
@@ -54,7 +56,13 @@ function CommentBody({ comment, avatarSize }: { comment: Comment; avatarSize: nu
   );
 }
 
-export const CommentCard = memo(function CommentCard({ thread, myChannelId, onReply, moderation }: Props) {
+export const CommentCard = memo(function CommentCard({
+  thread,
+  myChannelId,
+  onReply,
+  moderation,
+  onOpenOnYouTube,
+}: Props) {
   const [showReplies, setShowReplies] = useState(false);
   const [replying, setReplying] = useState(false);
   const replied = hasChannelReplied(thread, myChannelId);
@@ -64,7 +72,10 @@ export const CommentCard = memo(function CommentCard({ thread, myChannelId, onRe
     <ThemedView type="backgroundElement" style={styles.card}>
       <Pressable
         style={styles.video}
-        onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${thread.videoId}&lc=${thread.id}`)}>
+        onPress={() => {
+          onOpenOnYouTube?.();
+          Linking.openURL(`https://www.youtube.com/watch?v=${thread.videoId}&lc=${thread.id}`);
+        }}>
         {video?.thumbnailUrl && (
           <Image source={{ uri: video.thumbnailUrl }} style={styles.thumbnail} contentFit="cover" />
         )}
@@ -92,11 +103,18 @@ export const CommentCard = memo(function CommentCard({ thread, myChannelId, onRe
             </ThemedText>
           </Pressable>
         )}
-        {replied && (
-          <ThemedText type="small" style={styles.badge}>
-            ✓ Répondu
-          </ThemedText>
-        )}
+        <View style={styles.badges}>
+          {thread.comment.likedByMe && (
+            <ThemedText type="small" style={styles.badge}>
+              💚 Liké
+            </ThemedText>
+          )}
+          {replied && (
+            <ThemedText type="small" style={styles.badge}>
+              ✓ Répondu
+            </ThemedText>
+          )}
+        </View>
       </View>
 
       {replying && (
@@ -129,7 +147,8 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
   text: { fontSize: 15, lineHeight: 21, fontWeight: 400 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four, paddingLeft: 48 },
-  badge: { color: '#30A46C', marginLeft: 'auto' },
+  badges: { flexDirection: 'row', gap: Spacing.two, marginLeft: 'auto' },
+  badge: { color: '#30A46C' },
   offBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(229, 72, 77, 0.15)',
