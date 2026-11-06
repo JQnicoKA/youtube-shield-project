@@ -1,6 +1,7 @@
+import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
@@ -30,6 +31,12 @@ export function AccountModal({ visible, channel, email, onClose, onSignOut }: Pr
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {/* Fond flouté (iOS). Sur Android, le flou ne traverse pas la fenêtre du Modal : fond assombri. */}
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={90} tint="systemThinMaterialDark" style={StyleSheet.absoluteFill} />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.androidDim]} />
+      )}
       {/* Toucher le fond ferme la fenêtre */}
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer">
         {/* Le Pressable intérieur empêche qu'un toucher sur la carte ne la ferme */}
@@ -83,9 +90,9 @@ export function AccountModal({ visible, channel, email, onClose, onSignOut }: Pr
 }
 
 const styles = StyleSheet.create({
+  androidDim: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.four,
