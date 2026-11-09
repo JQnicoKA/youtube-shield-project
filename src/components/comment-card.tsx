@@ -9,8 +9,9 @@ import { ReplyBox } from '@/components/reply-box';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
+import { IG_MAX_COMMENT_LENGTH } from '@/services/instagram';
 import { blurReason, type BlurReason, type ModerationStatus } from '@/services/moderation';
-import { hasChannelReplied, type Comment, type CommentThread } from '@/services/youtube';
+import { hasChannelReplied, type Comment, type CommentThread, type Platform as SocialPlatform } from '@/services/youtube';
 import { formatRelativeTime } from '@/utils/relative-time';
 
 const BADGE_COLOR = '#30A46C';
@@ -18,16 +19,35 @@ const BADGE_SIZE = 16;
 /** Intensité du flou sur les commentaires offensants (0-100). */
 const CONTENT_BLUR = 80;
 
+const PLATFORMS = {
+  youtube: {
+    name: 'YouTube',
+    color: '#FF0033',
+    icon: { ios: 'play.rectangle.fill', android: 'smart_display' },
+  },
+  instagram: {
+    name: 'Instagram',
+    color: '#E1306C',
+    icon: { ios: 'camera.fill', android: 'photo_camera' },
+  },
+} as const satisfies Record<SocialPlatform, unknown>;
+
+function threadUrl(thread: CommentThread): string {
+  if (thread.platform === 'instagram') return thread.permalink ?? 'https://www.instagram.com/';
+  return `https://www.youtube.com/watch?v=${thread.videoId}&lc=${thread.id}`;
+}
+
 type Props = {
   thread: CommentThread;
-  myChannelId: string;
-  onReply: (threadId: string, text: string) => Promise<unknown>;
+  /** ID de ma chaîne YouTube, ou mon nom d'utilisateur Instagram (selon la plateforme du fil). */
+  myChannelId?: string;
+  onReply: (thread: CommentThread, text: string) => Promise<unknown>;
   moderation?: ModerationStatus;
   /** L'utilisateur a touché « See anyway » sur ce commentaire. */
   revealed: boolean;
   /** « See anyway » (true) ou « Flouter » (false). */
   onRevealChange: (threadId: string, revealed: boolean) => void;
-  /** Appelé quand on ouvre le commentaire dans YouTube (pour rafraîchir au retour). */
+  /** Appelé quand on ouvre le commentaire dans YouTube/Instagram (pour rafraîchir au retour). */
   onOpenOnYouTube?: () => void;
 };
 
@@ -140,6 +160,7 @@ export const CommentCard = memo(function CommentCard({
   const [replying, setReplying] = useState(false);
   const replied = hasChannelReplied(thread, myChannelId);
   const { video } = thread;
+  const platform = PLATFORMS[thread.platform];
   const reason = blurReason(moderation, revealed);
 
   return (
@@ -148,13 +169,19 @@ export const CommentCard = memo(function CommentCard({
         style={styles.video}
         onPress={() => {
           onOpenOnYouTube?.();
-          Linking.openURL(`https://www.youtube.com/watch?v=${thread.videoId}&lc=${thread.id}`);
+          Linking.openURL(threadUrl(thread));
         }}>
+        <SymbolView
+          name={platform.icon}
+          size={16}
+          tintColor={platform.color}
+          accessibilityLabel={platform.name}
+        />
         {video?.thumbnailUrl && (
           <Image source={{ uri: video.thumbnailUrl }} style={styles.thumbnail} contentFit="cover" />
         )}
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.flex}>
-          {video?.title ?? 'Vidéo'}
+          {video?.title ?? (thread.platform === 'instagram' ? 'Publication' : 'Vidéo')}
         </ThemedText>
       </Pressable>
 
@@ -203,7 +230,11 @@ export const CommentCard = memo(function CommentCard({
       </View>
 
       {replying && (
-        <ReplyBox onSubmit={(text) => onReply(thread.id, text)} onCancel={() => setReplying(false)} />
+        <ReplyBox
+          onSubmit={(text) => onReply(thread, text)}
+          onCancel={() => setReplying(false)}
+          maxLength={thread.platform === 'instagram' ? IG_MAX_COMMENT_LENGTH : undefined}
+        />
       )}
 
       {showReplies && (
@@ -213,7 +244,7 @@ export const CommentCard = memo(function CommentCard({
           ))}
           {thread.totalReplyCount > thread.replies.length && (
             <ThemedText type="small" themeColor="textSecondary">
-              + {thread.totalReplyCount - thread.replies.length} autres réponses sur YouTube
+              + {thread.totalReplyCount - thread.replies.length} autres réponses sur {platform.name}
             </ThemedText>
           )}
         </View>

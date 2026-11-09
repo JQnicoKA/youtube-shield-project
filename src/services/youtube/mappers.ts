@@ -33,6 +33,7 @@ export function mapThread(api: ApiCommentThread, videos?: Map<string, VideoInfo>
 
   return {
     id: api.id,
+    platform: 'youtube',
     videoId: api.snippet.videoId,
     video: videos?.get(api.snippet.videoId),
     comment: mapComment(api.snippet.topLevelComment),

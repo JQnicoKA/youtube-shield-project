@@ -10,9 +10,11 @@ const MAX_LENGTH = 10_000; // limite YouTube
 type Props = {
   onSubmit: (text: string) => Promise<unknown>;
   onCancel: () => void;
+  /** Longueur maximale (par défaut : limite YouTube). */
+  maxLength?: number;
 };
 
-export function ReplyBox({ onSubmit, onCancel }: Props) {
+export function ReplyBox({ onSubmit, onCancel, maxLength = MAX_LENGTH }: Props) {
   const theme = useTheme();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -45,7 +47,7 @@ export function ReplyBox({ onSubmit, onCancel }: Props) {
         placeholderTextColor={theme.textSecondary}
         multiline
         autoFocus
-        maxLength={MAX_LENGTH}
+        maxLength={maxLength}
         editable={!sending}
         style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
       />

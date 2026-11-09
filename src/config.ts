@@ -9,6 +9,12 @@ export const config = {
    */
   moderationUrl: process.env.EXPO_PUBLIC_MODERATION_URL ?? '',
   moderationApiKey: process.env.EXPO_PUBLIC_MODERATION_API_KEY ?? '',
+  /**
+   * Instagram API with Unified Login : ID du compte pro + jeton d'utilisateur système.
+   * ⚠️ Même remarque que pour la clé Azure : intégrés au bundle, acceptable pour un usage perso.
+   */
+  igUserId: process.env.EXPO_PUBLIC_IG_USER_ID ?? '',
+  igAccessToken: process.env.EXPO_PUBLIC_IG_ACCESS_TOKEN ?? '',
 };
 
 /** Scope requis pour lire les commentaires de la chaîne ET y répondre. */

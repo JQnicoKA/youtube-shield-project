@@ -18,9 +18,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useCommentThreads, useReplyToComment } from '@/hooks/use-comments';
+import { useInstagramFeed, useReplyToInstagramComment } from '@/hooks/use-instagram';
 import { useShield } from '@/hooks/use-shield';
 import { useAuth } from '@/providers/auth-provider';
+import { InstagramApiError } from '@/services/instagram';
 import { YouTubeApiError, type Channel, type CommentThread } from '@/services/youtube';
+import { mergeFeeds } from '@/utils/merge-feeds';
 
 function errorMessage(error: unknown): string {
   if (error instanceof YouTubeApiError) {
@@ -35,6 +38,7 @@ function errorMessage(error: unknown): string {
         return 'Pas de connexion internet.';
     }
   }
+  if (error instanceof InstagramApiError && error.kind === 'network') return 'Pas de connexion internet.';
   return error instanceof Error ? error.message : 'Erreur inconnue';
 }
 
@@ -47,8 +51,15 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const query = useCommentThreads(channel.id);
   const { mutateAsync: postReply } = useReplyToComment(channel.id);
+  const igQuery = useInstagramFeed();
+  const { mutateAsync: postIgReply } = useReplyToInstagramComment();
+  const igUsername = igQuery.data?.profile.username;
 
-  const threads = useMemo(() => query.data?.pages.flatMap((p) => p.threads) ?? [], [query.data]);
+  const ytThreads = useMemo(() => query.data?.pages.flatMap((p) => p.threads) ?? [], [query.data]);
+  const threads = useMemo(
+    () => mergeFeeds(ytThreads, igQuery.data?.threads ?? [], !!query.hasNextPage),
+    [ytThreads, igQuery.data, query.hasNextPage],
+  );
   const shield = useShield(threads);
   const { getStatus } = shield;
 
@@ -69,7 +80,12 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
   const onOpenOnYouTube = useCallback(() => {
     openedYouTube.current = true;
   }, []);
-  const { refetch } = query;
+  const { refetch: refetchYouTube } = query;
+  const { refetch: refetchInstagram } = igQuery;
+  const refetch = useCallback(
+    () => Promise.all([refetchYouTube(), refetchInstagram()]),
+    [refetchYouTube, refetchInstagram],
+  );
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && openedYouTube.current) {
@@ -81,18 +97,21 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
   }, [refetch]);
 
   const onReply = useCallback(
-    (threadId: string, text: string) =>
-      postReply({ threadId, text }).catch((e) => {
+    (thread: CommentThread, text: string) =>
+      (thread.platform === 'instagram'
+        ? postIgReply({ commentId: thread.id, text })
+        : postReply({ threadId: thread.id, text })
+      ).catch((e) => {
         throw toReplyError(e);
       }),
-    [postReply],
+    [postReply, postIgReply],
   );
 
   const renderItem = useCallback(
     ({ item }: { item: CommentThread }) => (
       <CommentCard
         thread={item}
-        myChannelId={channel.id}
+        myChannelId={item.platform === 'instagram' ? igUsername : channel.id}
         onReply={onReply}
         moderation={getStatus(item)}
         revealed={revealed.has(item.id)}
@@ -100,7 +119,7 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
         onOpenOnYouTube={onOpenOnYouTube}
       />
     ),
-    [channel.id, onReply, getStatus, revealed, onRevealChange, onOpenOnYouTube],
+    [channel.id, igUsername, onReply, getStatus, revealed, onRevealChange, onOpenOnYouTube],
   );
 
   return (
@@ -134,7 +153,7 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
       ) : query.isError && threads.length === 0 ? (
         <View style={styles.center}>
           <ThemedText style={styles.centerText}>{errorMessage(query.error)}</ThemedText>
-          <Pressable onPress={() => query.refetch()}>
+          <Pressable onPress={() => void refetch()}>
             <ThemedText type="linkPrimary">Réessayer</ThemedText>
           </Pressable>
         </View>
@@ -150,20 +169,31 @@ export function CommentsScreen({ channel }: { channel: Channel }) {
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
-              refreshing={query.isRefetching && !query.isFetchingNextPage}
-              onRefresh={() => void query.refetch()}
+              refreshing={(query.isRefetching && !query.isFetchingNextPage) || igQuery.isRefetching}
+              onRefresh={() => void refetch()}
             />
           }
           onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
           onEndReachedThreshold={0.5}
           onViewableItemsChanged={shield.onViewableItemsChanged}
           ListHeaderComponent={
-            shield.fatalError ? (
-              <Pressable onPress={shield.retryErrors} style={styles.banner}>
-                <ThemedText type="small" style={styles.bannerText}>
-                  Analyse des commentaires indisponible : {shield.fatalError}. Toucher pour réessayer.
-                </ThemedText>
-              </Pressable>
+            shield.fatalError || igQuery.isError ? (
+              <View style={styles.banners}>
+                {igQuery.isError && (
+                  <Pressable onPress={() => void refetchInstagram()} style={styles.banner}>
+                    <ThemedText type="small" style={styles.bannerText}>
+                      Instagram indisponible : {errorMessage(igQuery.error)}. Toucher pour réessayer.
+                    </ThemedText>
+                  </Pressable>
+                )}
+                {shield.fatalError && (
+                  <Pressable onPress={shield.retryErrors} style={styles.banner}>
+                    <ThemedText type="small" style={styles.bannerText}>
+                      Analyse des commentaires indisponible : {shield.fatalError}. Toucher pour réessayer.
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </View>
             ) : undefined
           }
           ListEmptyComponent={
@@ -186,6 +216,7 @@ const styles = StyleSheet.create({
   centerText: { textAlign: 'center' },
   list: { padding: Spacing.three, gap: Spacing.three },
   footer: { marginVertical: Spacing.four },
+  banners: { gap: Spacing.two },
   banner: {
     backgroundColor: 'rgba(229, 72, 77, 0.12)',
     borderRadius: Spacing.three,

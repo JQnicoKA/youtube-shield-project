@@ -83,9 +83,15 @@ export type VideoInfo = {
   thumbnailUrl?: string;
 };
 
+export type Platform = 'youtube' | 'instagram';
+
 export type CommentThread = {
   id: string;
+  platform: Platform;
+  /** ID de la vidéo YouTube, ou du post Instagram. */
   videoId: string;
+  /** Lien vers le post (Instagram uniquement ; pour YouTube il est construit à partir des IDs). */
+  permalink?: string;
   video?: VideoInfo;
   comment: Comment;
   canReply: boolean;
