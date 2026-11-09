@@ -136,7 +136,14 @@ function CommentBody({ comment, avatarSize }: { comment: Comment; avatarSize: nu
             · {formatRelativeTime(comment.publishedAt)}
           </ThemedText>
         </View>
-        <ThemedText style={styles.text}>{comment.text}</ThemedText>
+        {comment.text.trim() ? (
+          <ThemedText style={styles.text}>{comment.text}</ThemedText>
+        ) : (
+          // Instagram ne transmet pas les GIF/stickers via l'API : le commentaire arrive sans texte.
+          <ThemedText type="small" themeColor="textSecondary" style={styles.media}>
+            GIF ou sticker — non visible
+          </ThemedText>
+        )}
         {comment.likeCount > 0 && (
           <ThemedText type="small" themeColor="textSecondary">
             👍 {comment.likeCount}
@@ -262,6 +269,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   flexShrink: { flexShrink: 1 },
   text: { fontSize: 15, lineHeight: 21, fontWeight: 400 },
+  media: { fontStyle: 'italic' },
   footer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four, paddingLeft: 48 },
   badges: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginLeft: 'auto' },
   offBadge: {

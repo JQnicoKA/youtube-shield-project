@@ -52,7 +52,7 @@ export function useModeration(threads: CommentThread[]) {
     queries: threads.map((t) => ({
       queryKey: moderationKey(t.comment.id),
       queryFn: () => classifyComment(t.comment.text),
-      enabled: isModerationConfigured,
+      enabled: isModerationConfigured && !!t.comment.text.trim(),
       staleTime: Infinity,
       gcTime: Infinity,
       retry: (count: number, error: Error) => !isFatal(error) && count < 1,

@@ -29,7 +29,8 @@ export function useShield(threads: CommentThread[]) {
    */
   const getStatus = useCallback(
     (t: CommentThread): ModerationStatus | undefined => {
-      if (!enabled) return undefined;
+      // Commentaire sans texte (GIF/sticker Instagram) : rien à analyser, rien à flouter.
+      if (!enabled || !t.comment.text.trim()) return undefined;
       return statuses.get(t.comment.id) ?? (fatalError ? undefined : PENDING);
     },
     [enabled, statuses, fatalError],
